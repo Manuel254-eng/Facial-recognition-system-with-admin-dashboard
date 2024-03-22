@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Face Recognition</title>
+</head>
+<body>
+    <h1>Face Recognition</h1>
+
+    <img id="video_feed" width="640" height="480" style="border: 2px solid black;" />
+
+    <script>
+        var video = document.getElementById('video_feed');
+
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(function(stream) {
+                    video.srcObject = stream;
+                    video.play();
+                })
+                .catch(function(err) {
+                    console.error('Error accessing the camera:', err);
+                });
+        }
+
+        // Add logic to continuously update the video stream
+        function updateVideo() {
+            fetch('/video_feed')
+                .then(response => {
+                    const reader = response.body.getReader();
+                    const stream = new ReadableStream({
+                        start(controller) {
+                            function push() {
+                                reader.read().then(({ done, value }) => {
+                                    if (done) {
+                                        console.log('Stream complete');
+                                        controller.close();
+                                        return;
+                                    }
+                                    controller.enqueue(value);
+                                    push();
+                                }).catch(error => {
+                                    console.error('Error reading stream:', error);
+                                    controller.error(error);
+                                });
+                            }
+                            push();
+                        }
+                    });
+
+                    return new Response(stream, { headers: { 'Content-Type': 'image/jpeg' } });
+                })
+                .then(response => {
+                    video.src = URL.createObjectURL(response.body);
+                })
+                .catch(error => {
+                    console.error('Error updating video feed:', error);
+                });
+        }
+
+        setInterval(updateVideo, 100); // Update video every 100 milliseconds
+    </script>
+</body>
+</html>
